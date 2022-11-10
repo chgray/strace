@@ -1958,7 +1958,8 @@ get_os_release(void)
 static void
 set_sighandler(int signo, void (*sighandler)(int), struct sigaction *oldact)
 {
-	#error trace here
+	CG_PRINT("set_sighandler(%d) = 0x%x\r\n", signo, oldact);
+	
 	const struct sigaction sa = { .sa_handler = sighandler };
 	sigaction(signo, &sa, oldact);
 }
