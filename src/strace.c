@@ -8,7 +8,6 @@
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
-
 #include "defs.h"
 #include <stdarg.h>
 #include <limits.h>
@@ -94,6 +93,81 @@ static int rflag_width = 6;
 static bool print_pid_pfx;
 
 static unsigned int version_verbosity;
+
+void CG_PRINT(const char* format, ...);
+void CG_PRINT(const char* format, ...) 
+{ 
+    static FILE *out = 0;
+	static int myPid = 0;
+    static bool parent = true;
+	
+	char msg[1000];
+    if(0 == out || myPid != getpid())
+    {
+        if(myPid != 0)
+            parent = false;
+            
+		myPid = getpid();
+        if(parent)
+            sprintf(msg, "STrace.parent.log");
+        else
+            sprintf(msg, "STrace.child.log");
+            
+		//sprintf(msg, "STrace.%d.log", getpid()); 
+        out = fopen(msg, "at");    
+		fprintf(out, "NEW %d\r\n", getpid()); 
+    }
+        
+    va_list args;
+    va_start (args, format);
+    vsprintf (msg, format, args);
+    va_end (args);
+    
+    fprintf(out, "%7d(%d) [*****] %s", getpid(), parent, msg);
+    printf("%7d(%d) [*****] %s", getpid(), parent, msg);
+ 
+    fflush(out);
+}
+
+#define cg_ptracep ptrace
+#define cg_ptracel ptrace
+
+#if 0
+//long cg_ptrace2(enum __ptrace_request request, pid_t pid,
+//                   void *addr, void *data);
+long cg_ptracep(enum __ptrace_request request, pid_t pid,
+                   void *addr, void *data);
+				   
+long cg_ptracel(enum __ptrace_request request, pid_t pid,
+                   void *addr, unsigned long data);
+				   
+				   
+				   
+long cg_ptracep(enum __ptrace_request request, pid_t pid, void *addr, void *data)
+{
+	CG_PRINT("CG_PTRACE2(0x%x on %d by myPID=%d)\r\n", request, pid, getpid());
+	long ret = ptrace(request, pid, addr, data);
+	CG_PRINT("....ret=%ld\r\n", ret);
+	return ret;
+}
+/*
+long cg_ptrace(enum __ptrace_request request, pid_t pid,
+                   void *addr, void *data)
+{
+	CG_PRINT("CG_PTRACE_P(0x%x on %d by myPID=%d\r\n", request, pid, getpid());
+	long ret = ptrace(request, pid, addr, data);
+	CG_PRINT("....ret=%ld\r\n", ret);
+	return ret;
+}*/
+
+long cg_ptracel(enum __ptrace_request request, pid_t pid, void *addr, unsigned long data)
+{
+	CG_PRINT("CG_PTRACE_L(0x%x on %d by myPID=%d)\r\n", request, pid, getpid());
+	long ret = ptrace(request, pid, addr, data);
+	CG_PRINT("....ret=%ld\r\n", ret);
+	return ret;
+}
+#endif
 
 /* -I n */
 enum {
@@ -524,12 +598,23 @@ ptrace_attach_or_seize(int pid, const char **ptrace_attach_cmd)
 {
 	int r;
 	if (!use_seize)
+	{
+		CG_PRINT("Using ATTACH: pid=%d myPid=%d\r\n", pid, getpid());
 		return *ptrace_attach_cmd = "PTRACE_ATTACH",
-		       ptrace(PTRACE_ATTACH, pid, 0L, 0L);
-	r = ptrace(PTRACE_SEIZE, pid, 0L, (unsigned long) ptrace_setoptions);
+		       cg_ptracel(PTRACE_ATTACH, pid, 0L, 0L);
+	}
+	
+	CG_PRINT("Using SEIZE : options=%d: pid=%d myPid=%d\r\n", ptrace_setoptions, pid, getpid());
+	r = cg_ptracel(PTRACE_SEIZE, pid, 0L, (unsigned long) ptrace_setoptions);
+	CG_PRINT("...ret=%d: pid=%d myPid=%d\r\n", r, pid, getpid());
 	if (r)
 		return *ptrace_attach_cmd = "PTRACE_SEIZE", r;
-	r = ptrace(PTRACE_INTERRUPT, pid, 0L, 0L);
+		
+	CG_PRINT("...calling PTRACE_INTERRUPT: pid=%d myPid=%d\r\n", pid, getpid());
+	r = cg_ptracel(PTRACE_INTERRUPT, pid, 0L, 0L);
+	
+	CG_PRINT("PARENT: ...interrupt ret=%d: pid=%d myPid=%d\r\n", r, pid, getpid());
+            
 	return *ptrace_attach_cmd = "PTRACE_INTERRUPT", r;
 }
 
@@ -556,9 +641,9 @@ static int
 ptrace_restart(const unsigned int op, struct tcb *const tcp, unsigned int sig)
 {
 	int err;
-
 	errno = 0;
-	ptrace(op, tcp->pid, 0L, (unsigned long) sig);
+	CG_PRINT("PTRACE(%d) on pid=%d\r\n", op, tcp->pid);	
+	cg_ptracel(op, tcp->pid, 0L, (unsigned long) sig);
 	err = errno;
 	if (!err || err == ESRCH)
 		return 0;
@@ -567,19 +652,18 @@ ptrace_restart(const unsigned int op, struct tcb *const tcp, unsigned int sig)
 	 * Why curcol != 0? Otherwise sometimes we get this:
 	 *
 	 * 10252 kill(10253, SIGKILL)              = 0
-	 *  <ptrace(SYSCALL,10252):No such process>10253 ...next decode...
+	 *  <cg_ptrace(SYSCALL,10252):No such process>10253 ...next decode...
 	 *
 	 * 10252 died after we retrieved syscall exit data,
 	 * but before we tried to restart it. Log looks ugly.
 	 */
 	if (current_tcp && current_tcp->curcol != 0) {
-		tprintf(" <Cannot restart pid %d with ptrace(%s): %s>\n",
+		tprintf(" <Cannot restart pid %d with cg_ptrace(%s): %s>\n",
 			tcp->pid, ptrace_op_str(op), strerror(err));
 		line_ended();
 	}
 	errno = err;
-	perror_msg("ptrace(%s,pid:%d,sig:%u)",
-		   ptrace_op_str(op), tcp->pid, sig);
+	perror_msg("ptrace_restart(%s,pid:%d,sig:%u)", ptrace_op_str(op), tcp->pid, sig);
 	return -1;
 }
 
@@ -1140,14 +1224,16 @@ detach(struct tcb *tcp)
 	if (tcp->flags & TCB_IGNORE_ONE_SIGSTOP)
 		goto wait_loop;
 
-	error = ptrace(PTRACE_DETACH, tcp->pid, 0, 0);
+	CG_PRINT("PTRAACE(PTRAACE_DETACH) on pid=%d\r\n", tcp->pid);
+		
+	error = cg_ptracel(PTRACE_DETACH, tcp->pid, 0, 0);
 	if (!error) {
 		/* On a clear day, you can see forever. */
 		goto drop;
 	}
 	if (errno != ESRCH) {
 		/* Shouldn't happen. */
-		perror_func_msg("ptrace(PTRACE_DETACH,%u)", tcp->pid);
+		perror_func_msg("cg_ptracel(PTRACE_DETACH,%u)", tcp->pid);
 		goto drop;
 	}
 	/* ESRCH: process is either not stopped or doesn't exist. */
@@ -1166,11 +1252,12 @@ detach(struct tcb *tcp)
 		 * Need to use INTERRUPT.
 		 * Testcase: trying to ^C a "strace -p <stopped_process>".
 		 */
-		error = ptrace(PTRACE_INTERRUPT, tcp->pid, 0, 0);
+		CG_PRINT("PTRAACE(PTRAACE_INTERRUPT) on pid=%d\r\n", tcp->pid);
+		error = cg_ptracel(PTRACE_INTERRUPT, tcp->pid, 0, 0);
 		if (!error)
 			goto wait_loop;
 		if (errno != ESRCH)
-			perror_func_msg("ptrace(PTRACE_INTERRUPT,%u)", tcp->pid);
+			perror_func_msg("cg_ptracel(PTRACE_INTERRUPT,%u)", tcp->pid);
 	} else {
 		error = my_tkill(tcp->pid, SIGSTOP);
 		if (!error)
@@ -1308,7 +1395,7 @@ attach_tcb(struct tcb *const tcp)
 	const char *ptrace_attach_cmd;
 
 	if (ptrace_attach_or_seize(tcp->pid, &ptrace_attach_cmd) < 0) {
-		perror_msg("attach: ptrace(%s, %d)",
+		perror_msg("attach: cg_ptrace(%s, %d)",
 			   ptrace_attach_cmd, tcp->pid);
 		droptcb(tcp);
 		return;
@@ -1339,7 +1426,7 @@ attach_tcb(struct tcb *const tcp)
 			if (ptrace_attach_or_seize(tid, &ptrace_attach_cmd) < 0)
 			{
 				++nerr;
-				debug_perror_msg("attach: ptrace(%s, %d)",
+				debug_perror_msg("attach: cg_ptrace(%s, %d)",
 						 ptrace_attach_cmd, tid);
 				continue;
 			}
@@ -1366,6 +1453,8 @@ attach_tcb(struct tcb *const tcp)
 static void
 startup_attach(void)
 {
+	CG_PRINT("*****STARTUP_ATTACH\r\n");
+	
 	pid_t parent_pid = strace_tracer_pid;
 	struct tcb *tcp;
 
@@ -1461,12 +1550,22 @@ static void ATTRIBUTE_NOINLINE ATTRIBUTE_NORETURN
 exec_or_die(void)
 {
 	struct exec_params *params = &params_for_tracee;
+	
+	for(int i=10; i>0; --i)
+	{
+		CG_PRINT("Wait: pid=%d  i=%d\r\n", getpid(), i);
+		sleep(1);
+	}
+
+CG_PRINT("closing to close : pid=%d\r\n", getpid());
 
 	if (params->fd_to_close >= 0)
 		close(params->fd_to_close);
 	if (!daemonized_tracer && !use_seize) {
-		if (ptrace(PTRACE_TRACEME, 0L, 0L, 0L) < 0) {
-			perror_msg_and_die("ptrace(PTRACE_TRACEME, ...)");
+		
+		CG_PRINT("ptrace(PTRACE_TRACEME): pid=%d\r\n", getpid());
+		if (cg_ptracel(PTRACE_TRACEME, 0L, 0L, 0L) < 0) {
+			perror_msg_and_die("cg_ptracel(PTRACE_TRACEME, ...)");
 		}
 	}
 
@@ -1498,7 +1597,10 @@ exec_or_die(void)
 		 * vfork: parent is blocked, stopping would deadlock.
 		 */
 		if (!NOMMU_SYSTEM)
+		{
+			CG_PRINT("Killing ourselves: pid=%d\r\n", getpid());
 			kill(getpid(), SIGSTOP);
+		}
 	} else {
 		alarm(3);
 		/* we depend on SIGCHLD set to SIG_DFL by init code */
@@ -1508,13 +1610,18 @@ exec_or_die(void)
 		alarm(0);
 	}
 
+	CG_PRINT("...onward!: pid=%d\r\n", getpid());
 	if (params_for_tracee.child_sa.sa_handler != SIG_DFL)
+	{
+		CG_PRINT("SIGCHLD: pid=%d\r\n", getpid());
 		sigaction(SIGCHLD, &params_for_tracee.child_sa, NULL);
-
+	}
 	debug_msg("seccomp filter %s",
 		  seccomp_filtering ? "enabled" : "disabled");
 	if (seccomp_filtering)
 		init_seccomp_filter();
+		
+	CG_PRINT("Execing!: pid=%d\r\n", getpid());
 	execve(params->pathname, params->argv, params->env);
 	perror_msg_and_die("exec");
 }
@@ -1665,6 +1772,8 @@ startup_child(char **argv, char **env)
 	if (daemonized_tracer)
 		prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY);
 
+	CG_PRINT("*****STARTUP_CHILD\r\n");
+	
 	pid = fork();
 	if (pid < 0)
 		perror_func_msg_and_die("fork");
@@ -1708,7 +1817,7 @@ startup_child(char **argv, char **env)
 			const char *ptrace_attach_cmd;
 			if (ptrace_attach_or_seize(pid, &ptrace_attach_cmd)) {
 				kill_save_errno(pid, SIGKILL);
-				perror_msg_and_die("attach: ptrace(%s, %d)",
+				perror_msg_and_die("attach: cg_ptrace(%s, %d)",
 						   ptrace_attach_cmd, pid);
 			}
 			if (!NOMMU_SYSTEM)
@@ -1769,6 +1878,7 @@ startup_child(char **argv, char **env)
 	redirect_standard_fds();
 }
 
+#if 0
 static void
 test_ptrace_seize(void)
 {
@@ -1793,7 +1903,7 @@ test_ptrace_seize(void)
 	 * attaching tracee continues to run unless a trap condition occurs.
 	 * PTRACE_SEIZE doesn't affect signal or group stop state.
 	 */
-	if (ptrace(PTRACE_SEIZE, pid, 0, 0) == 0) {
+	if (cg_ptracel(PTRACE_SEIZE, pid, 0, 0) == 0) {
 		post_attach_sigstop = 0; /* this sets use_seize to 1 */
 	} else {
 		debug_msg("PTRACE_SEIZE doesn't work");
@@ -1818,6 +1928,7 @@ test_ptrace_seize(void)
 		error_func_msg_and_die("unexpected wait status %#x", status);
 	}
 }
+#endif
 
 static unsigned int
 get_os_release(void)
@@ -1849,6 +1960,11 @@ get_os_release(void)
 static void
 set_sighandler(int signo, void (*sighandler)(int), struct sigaction *oldact)
 {
+	FILE *fp = fopen("log.txt", "at");
+	fprintf(fp, "SET_SIGHANDLER: PID=%d, signo=%d, handler=%p\r\n", getpid(), signo, sighandler);
+	CG_PRINT("SET_SIGHANDLER: PID=%d, signo=%d, handler=%p\r\n", getpid(), signo, sighandler);
+	fclose(fp);
+	
 	const struct sigaction sa = { .sa_handler = sighandler };
 	sigaction(signo, &sa, oldact);
 }
@@ -2168,6 +2284,8 @@ init(int argc, char *argv[])
 	static const char ttflag_str[] = "precision:us,format:time";
 	static const char tttflag_str[] = "format:unix,precision:us";
 	static const char secontext_qual[] = "!full,mismatch";
+
+CG_PRINT("***INIT : pid=%d\r\n", getpid());
 
 	int c, i;
 	int optF = 0, zflags = 0;
@@ -2813,8 +2931,8 @@ init(int argc, char *argv[])
 		ptrace_setoptions |= PTRACE_O_TRACESECCOMP;
 
 	debug_msg("ptrace_setoptions = %#x", ptrace_setoptions);
-	test_ptrace_seize();
-	test_ptrace_get_syscall_info();
+	//test_ptrace_seize();
+	//test_ptrace_get_syscall_info();
 
 	/*
 	 * Is something weird with our stdin and/or stdout -
@@ -3065,7 +3183,9 @@ maybe_allocate_tcb(const int pid, int status)
 		 * WSTOPSIG(status), but it was later removed as the only
 		 * observable stop here is the initial ptrace-stop.
 		 */
-		ptrace(PTRACE_DETACH, pid, NULL, 0L);
+		
+		CG_PRINT("PTRAACE(PTRAACE_DETACH) on pid=%d\r\n", pid);
+		cg_ptracel(PTRACE_DETACH, pid, NULL, 0L);
 		if (!is_number_in_set(QUIET_ATTACH, quiet_set))
 			error_msg("Detached unknown pid %d", pid);
 		return NULL;
@@ -3230,7 +3350,10 @@ startup_tcb(struct tcb *tcp)
 	if (!use_seize) {
 		debug_msg("setting opts 0x%x on pid %d",
 			  ptrace_setoptions, tcp->pid);
-		if (ptrace(PTRACE_SETOPTIONS, tcp->pid, NULL, ptrace_setoptions) < 0) {
+		
+		
+		CG_PRINT("PTRACE(PTRACE_SETOPTIOPNS) 0x%x on pid=%d\r\n", ptrace_setoptions, tcp->pid);
+		if (cg_ptracel(PTRACE_SETOPTIONS, tcp->pid, NULL, ptrace_setoptions) < 0) {
 			if (errno != ESRCH) {
 				/* Should never happen, really */
 				perror_msg_and_die("PTRACE_SETOPTIONS");
@@ -3509,7 +3632,8 @@ next_event(void)
 					 * errno == EINVAL too?
 					 * We can get ESRCH instead, you know...
 					 */
-					bool stopped = ptrace(PTRACE_GETSIGINFO,
+					CG_PRINT("PTRACE_GETSIGINO on pid=%d\r\n", pid);					
+					bool stopped = cg_ptracep(PTRACE_GETSIGINFO,
 						pid, 0, &wd->si) < 0;
 
 					wd->te = stopped ? TE_GROUP_STOP
@@ -3538,7 +3662,8 @@ next_event(void)
 					 * errno == EINVAL here, too?
 					 * We can get ESRCH instead, you know...
 					 */
-				if (ptrace(PTRACE_GETEVENTMSG, pid, NULL,
+				CG_PRINT("PTRACE_GETEVENTMSG on pid=%d\r\n", pid);					
+				if (cg_ptracep(PTRACE_GETEVENTMSG, pid, NULL,
 				    &wd->msg) < 0)
 					wd->msg = 0;
 
@@ -3683,7 +3808,7 @@ dispatch_event(const struct tcb_wait_data *wd)
 	case TE_SYSCALL_STOP:
 		if (trace_syscall(current_tcp, &restart_sig) < 0) {
 			/*
-			 * ptrace() failed in trace_syscall().
+			 * cg_ptrace() failed in trace_syscall().
 			 * Likely a result of process disappearing mid-flight.
 			 * Observed case: exit_group() or SIGKILL terminating
 			 * all processes in thread group.
@@ -3965,6 +4090,8 @@ main(int argc, char *argv[])
 	exit_code = !nprocs;
 
 	while (dispatch_event(next_event()))
-		;
+	{
+		CG_PRINT("Event pid=%d\r\n", getpid());
+	}
 	terminate();
 }
