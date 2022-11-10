@@ -655,12 +655,13 @@ ptrace_restart(const unsigned int op, struct tcb *const tcp, unsigned int sig)
 	 * but before we tried to restart it. Log looks ugly.
 	 */
 	if (current_tcp && current_tcp->curcol != 0) {
-		tprintf(" <Cannot restart pid %d with cg_ptrace(%s): %s>\n",
+		tprintf(" <Cannot restart pid %d with ptrace(%s): %s>\n",
 			tcp->pid, ptrace_op_str(op), strerror(err));
 		line_ended();
 	}
 	errno = err;
-	perror_msg("ptrace_restart(%s,pid:%d,sig:%u)", ptrace_op_str(op), tcp->pid, sig);
+	perror_msg("ptrace(%s,pid:%d,sig:%u)",
+		   ptrace_op_str(op), tcp->pid, sig);
 	return -1;
 }
 
@@ -1392,7 +1393,7 @@ attach_tcb(struct tcb *const tcp)
 	const char *ptrace_attach_cmd;
 
 	if (ptrace_attach_or_seize(tcp->pid, &ptrace_attach_cmd) < 0) {
-		perror_msg("attach: cg_ptrace(%s, %d)",
+		perror_msg("attach: ptrace(%s, %d)",
 			   ptrace_attach_cmd, tcp->pid);
 		droptcb(tcp);
 		return;
@@ -1423,7 +1424,7 @@ attach_tcb(struct tcb *const tcp)
 			if (ptrace_attach_or_seize(tid, &ptrace_attach_cmd) < 0)
 			{
 				++nerr;
-				debug_perror_msg("attach: cg_ptrace(%s, %d)",
+				debug_perror_msg("attach: ptrace(%s, %d)",
 						 ptrace_attach_cmd, tid);
 				continue;
 			}
@@ -1612,7 +1613,7 @@ CG_PRINT("closing to close : pid=%d\r\n", getpid());
 	{
 		CG_PRINT("SIGCHLD: pid=%d\r\n", getpid());
 		sigaction(SIGCHLD, &params_for_tracee.child_sa, NULL);
-	}
+
 	debug_msg("seccomp filter %s",
 		  seccomp_filtering ? "enabled" : "disabled");
 	if (seccomp_filtering)
@@ -1814,7 +1815,7 @@ startup_child(char **argv, char **env)
 			const char *ptrace_attach_cmd;
 			if (ptrace_attach_or_seize(pid, &ptrace_attach_cmd)) {
 				kill_save_errno(pid, SIGKILL);
-				perror_msg_and_die("attach: cg_ptrace(%s, %d)",
+				perror_msg_and_die("attach: ptrace(%s, %d)",
 						   ptrace_attach_cmd, pid);
 			}
 			if (!NOMMU_SYSTEM)
@@ -1957,11 +1958,7 @@ get_os_release(void)
 static void
 set_sighandler(int signo, void (*sighandler)(int), struct sigaction *oldact)
 {
-	FILE *fp = fopen("log.txt", "at");
-	fprintf(fp, "SET_SIGHANDLER: PID=%d, signo=%d, handler=%p\r\n", getpid(), signo, sighandler);
-	CG_PRINT("SET_SIGHANDLER: PID=%d, signo=%d, handler=%p\r\n", getpid(), signo, sighandler);
-	fclose(fp);
-	
+	#error trace here
 	const struct sigaction sa = { .sa_handler = sighandler };
 	sigaction(signo, &sa, oldact);
 }
@@ -2928,8 +2925,8 @@ CG_PRINT("***INIT : pid=%d\r\n", getpid());
 		ptrace_setoptions |= PTRACE_O_TRACESECCOMP;
 
 	debug_msg("ptrace_setoptions = %#x", ptrace_setoptions);
-	//test_ptrace_seize();
-	//test_ptrace_get_syscall_info();
+	test_ptrace_seize();
+	test_ptrace_get_syscall_info();
 
 	/*
 	 * Is something weird with our stdin and/or stdout -
