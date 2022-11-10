@@ -1876,7 +1876,6 @@ startup_child(char **argv, char **env)
 	redirect_standard_fds();
 }
 
-#if 0
 static void
 test_ptrace_seize(void)
 {
@@ -1926,7 +1925,6 @@ test_ptrace_seize(void)
 		error_func_msg_and_die("unexpected wait status %#x", status);
 	}
 }
-#endif
 
 static unsigned int
 get_os_release(void)
