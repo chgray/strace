@@ -93,7 +93,9 @@ static int rflag_width = 6;
 static bool print_pid_pfx;
 
 static unsigned int version_verbosity;
-
+#if 1
+#define CG_PRINT(...)
+#else
 void CG_PRINT(const char* format, ...);
 void CG_PRINT(const char* format, ...) 
 { 
@@ -128,6 +130,9 @@ void CG_PRINT(const char* format, ...)
  
     fflush(out);
 }
+#endif
+
+
 
 #if 0
 //long cg_ptrace2(enum __ptrace_request request, pid_t pid,
