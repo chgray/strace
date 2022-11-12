@@ -93,7 +93,7 @@ static int rflag_width = 6;
 static bool print_pid_pfx;
 
 static unsigned int version_verbosity;
-#if 1
+#if 0
 #define CG_PRINT(...)
 #else
 void CG_PRINT(const char* format, ...);
@@ -126,7 +126,7 @@ void CG_PRINT(const char* format, ...)
     va_end (args);
     
     fprintf(out, "%7d(%d) [*****] %s", getpid(), parent, msg);
-    printf("%7d(%d) [*****] %s", getpid(), parent, msg);
+    //printf("%7d(%d) [*****] %s", getpid(), parent, msg);
  
     fflush(out);
 }
@@ -644,11 +644,14 @@ ptrace_restart(const unsigned int op, struct tcb *const tcp, unsigned int sig)
 {
 	int err;
 	errno = 0;
-	CG_PRINT("PTRACE(%d) on pid=%d\r\n", op, tcp->pid);	
+	CG_PRINT("PTRACE_RESTART,  operation(%d) on pid=%d, sig=%d\r\n", op, tcp->pid, sig);	
 	ptrace(op, tcp->pid, 0L, (unsigned long) sig);
 	err = errno;
 	if (!err || err == ESRCH)
+	{
+		CG_PRINT("...ptrace err=%d\r\n", err);
 		return 0;
+	}
 
 	/*
 	 * Why curcol != 0? Otherwise sometimes we get this:
@@ -1557,7 +1560,7 @@ exec_or_die(void)
 	for(int i=10; i>0; --i)
 	{
 		CG_PRINT("Wait: pid=%d  i=%d\r\n", getpid(), i);
-		sleep(1);
+		// sleep(1);
 	}
 
 CG_PRINT("closing to close : pid=%d\r\n", getpid());
@@ -1618,6 +1621,7 @@ CG_PRINT("closing to close : pid=%d\r\n", getpid());
 	{
 		CG_PRINT("SIGCHLD: pid=%d\r\n", getpid());
 		sigaction(SIGCHLD, &params_for_tracee.child_sa, NULL);
+	}
 
 	debug_msg("seccomp filter %s",
 		  seccomp_filtering ? "enabled" : "disabled");
@@ -3629,13 +3633,14 @@ next_event(void)
 					 * TODO: shouldn't we check for
 					 * errno == EINVAL too?
 					 * We can get ESRCH instead, you know...
-					 */
-					CG_PRINT("PTRACE_GETSIGINO on pid=%d\r\n", pid);					
+					 */					
 					bool stopped = ptrace(PTRACE_GETSIGINFO,
-						pid, 0, &wd->si) < 0;
+						pid, 0, &wd->si) < 0;					
 
 					wd->te = stopped ? TE_GROUP_STOP
 							 : TE_SIGNAL_DELIVERY_STOP;
+					
+					CG_PRINT("PTRACE_GETSIGINO on pid=%d, stopped=%d,  te=%d\r\n", pid, stopped, wd->te);					
 				}
 				break;
 			case PTRACE_EVENT_STOP:
@@ -3772,6 +3777,8 @@ dispatch_event(const struct tcb_wait_data *wd)
 	else
 		restart_op = PTRACE_SYSCALL;
 
+	CG_PRINT("Dispatching(event=%d)\r\n", te);
+
 	switch (te) {
 	case TE_BREAK:
 		return false;
@@ -3856,9 +3863,10 @@ dispatch_event(const struct tcb_wait_data *wd)
 		}
 		break;
 
-	case TE_SIGNAL_DELIVERY_STOP:
+	case TE_SIGNAL_DELIVERY_STOP:			
 		restart_sig = WSTOPSIG(status);
 		print_stopped(current_tcp, &wd->si, restart_sig);
+		CG_PRINT("TE_SIGNAL_DELIVERY_STOP(restart_sig=%d)\r\n", restart_sig);
 		break;
 
 	case TE_SIGNALLED:
@@ -3931,10 +3939,14 @@ dispatch_event(const struct tcb_wait_data *wd)
 
 	/* We handled quick cases, we are permitted to interrupt now. */
 	if (interrupted)
+	{
+		CG_PRINT("INTERRUPTED\r\n");
 		return false;
+	}
 
 	/* If the process is being delayed, do not ptrace_restart just yet */
 	if (syscall_delayed(current_tcp)) {
+		CG_PRINT("SYSCALL_DELAYED\r\n");
 		if (current_tcp->delayed_wait_data)
 			error_func_msg("pid %d has delayed wait data set"
 				       " already", current_tcp->pid);
@@ -3944,6 +3956,7 @@ dispatch_event(const struct tcb_wait_data *wd)
 		return true;
 	}
 
+	
 	if (ptrace_restart(restart_op, current_tcp, restart_sig) < 0) {
 		/* Note: ptrace_restart emitted error message */
 		exit_code = 1;
@@ -4089,7 +4102,7 @@ main(int argc, char *argv[])
 
 	while (dispatch_event(next_event()))
 	{
-		CG_PRINT("Event pid=%d\r\n", getpid());
+		//CG_PRINT("Event pid=%d\r\n", getpid());
 	}
 	terminate();
 }
