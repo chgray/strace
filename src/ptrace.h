@@ -29,6 +29,9 @@ long cg_ptrace_lp(enum __ptrace_request request, pid_t pid,
 				   
 __pid_t cg_waitpid (__pid_t __pid, int *__stat_loc, int __options);
 
+long int GC_GetTickCount();
+void GetProcessName(int pid, char *name);
+
 # ifdef HAVE_STRUCT_IA64_FPREG
 #  define ia64_fpreg XXX_ia64_fpreg
 # endif

@@ -135,6 +135,35 @@ void CG_PRINT(const char* format, ...)
 
 
 #if 1
+/*
+long int CG_GetTickCount()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)(ts.tv_nsec / 1000000) + ((uint64_t)ts.tv_sec * 1000ull);
+}*/
+
+void GetProcessName(int pid, char *name)
+{
+	char fileName[256];
+	name[0] = 0;
+	sprintf(fileName, "/proc/%d/comm", pid);
+    
+    FILE *f = fopen(fileName, "rt");
+    if (NULL == f)
+	{
+        sprintf(name, "UNKNOWN");
+		return;
+	}
+
+    int written = fscanf(f, "%s", name);
+	if(written > 100)
+		exit(188);
+		
+    fclose(f);
+}
+
+
 // long cg_ptrace2(enum __ptrace_request request, pid_t pid,
 //                    void *addr, void *data);
 long cg_ptrace(enum __ptrace_request request, pid_t pid,
@@ -155,10 +184,14 @@ __pid_t cg_wait(int *__stat_loc);
 
 __pid_t cg_waitpid(__pid_t __pid, int *__stat_loc, int __options)
 {
+	//unsigned long tick = CG_GetTickCount();
 	__pid_t ret = waitpid(__pid, __stat_loc, __options);	
 	int e = errno;
 		
-	CG_PRINT("NEW_CG_WAITPID(pid=%d) = %d\r\n", __pid, ret);
+	char processName[1024];
+	GetProcessName(ret, processName);
+		
+	CG_PRINT("NEW_CG_WAITPID(pid=(%s)%d = %d\r\n", processName, __pid, ret);
 	
 	errno = e;
 	return ret;
@@ -170,7 +203,10 @@ __pid_t cg_wait4(__pid_t __pid, int *__stat_loc, int __options,
 	__pid_t ret = wait4(__pid, __stat_loc, __options, __usage);
 	int e = errno;
 	
-	CG_PRINT("NEW_CG_WAIT4(pid=%d,  ret=%d)\r\n", __pid, ret);	
+	char processName[1024];
+	GetProcessName(ret, processName);
+	
+	CG_PRINT("NEW_CG_WAIT4(pid=(%s)%d,  ret=%d)\r\n", processName, __pid, ret);	
 	
 	errno = e;
 	return ret;
@@ -181,7 +217,10 @@ __pid_t cg_wait(int *__stat_loc)
 	__pid_t ret = wait(__stat_loc);
 	int e = errno;
 	
-	CG_PRINT("NEW_CG_WAIT(ret=%d)\r\n", ret);	
+	char processName[1024];
+	GetProcessName(ret, processName);
+	
+	CG_PRINT("NEW_CG_WAIT(ret=(%s)%d\r\n", processName, ret);	
 	
 	errno = e;
 	return ret;
@@ -189,10 +228,13 @@ __pid_t cg_wait(int *__stat_loc)
 
 long cg_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
 {
+	char processName[1024];
+	GetProcessName(pid, processName);
+	
 	long ret = ptrace(request, pid, addr, data);
 	
 	int e = errno;	
-	CG_PRINT("NEW_CG_PTRACE(request=0x%8x, pid=%8d, addr=0x%8x, data=0x%8x) - ret=%ld\r\n", request, pid, addr, data, ret);
+	CG_PRINT("NEW_CG_PTRACE(request=0x%8x, pid=(%s)%8d, addr=0x%8x, data=0x%8x) - ret=%ld\r\n", request, processName, pid, addr, data, ret);
 	
 	errno = e;	
 	return ret;
