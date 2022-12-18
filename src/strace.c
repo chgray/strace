@@ -143,32 +143,58 @@ long cg_ptrace_l(enum __ptrace_request request, pid_t pid,
 				 unsigned long addr, unsigned long data);
 long cg_ptrace_lp(enum __ptrace_request request, pid_t pid,
 				  unsigned long addr, void *data);
+				  
+__pid_t cg_waitpid (__pid_t __pid, int *__stat_loc, int __options);
 
 __pid_t cg_wait4(__pid_t __pid, int *__stat_loc, int __options,
 				 struct rusage *__usage) __THROWNL;
 
 __pid_t cg_wait(int *__stat_loc);
 
+
+
+__pid_t cg_waitpid(__pid_t __pid, int *__stat_loc, int __options)
+{
+	__pid_t ret = waitpid(__pid, __stat_loc, __options);	
+	int e = errno;
+		
+	CG_PRINT("NEW_CG_WAITPID(pid=%d) = %d\r\n", __pid, ret);
+	
+	errno = e;
+	return ret;
+}
+
 __pid_t cg_wait4(__pid_t __pid, int *__stat_loc, int __options,
 				 struct rusage *__usage)
 {
-	CG_PRINT("CG_WAIT4(pid=%d)\r\n", __pid);
+	__pid_t ret = wait4(__pid, __stat_loc, __options, __usage);
+	int e = errno;
 	
-	return wait4(__pid, __stat_loc, __options, __usage);
+	CG_PRINT("NEW_CG_WAIT4(pid=%d,  ret=%d)\r\n", __pid, ret);	
+	
+	errno = e;
+	return ret;
 }
 
 __pid_t cg_wait(int *__stat_loc)
 {
-	CG_PRINT("CG_WAIT()\r\n");
-	return wait(__stat_loc);
+	__pid_t ret = wait(__stat_loc);
+	int e = errno;
+	
+	CG_PRINT("NEW_CG_WAIT(ret=%d)\r\n", ret);	
+	
+	errno = e;
+	return ret;
 }
 
 long cg_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
 {
-
-	CG_PRINT("CG_PTRACE(request=0x%8x, pid=%8d, addr=0x%8x, data=0x%8x)\r\n", request, pid, addr, data);
 	long ret = ptrace(request, pid, addr, data);
-	CG_PRINT("....ret=%ld\r\n", ret);
+	
+	int e = errno;	
+	CG_PRINT("NEW_CG_PTRACE(request=0x%8x, pid=%8d, addr=0x%8x, data=0x%8x) - ret=%ld\r\n", request, pid, addr, data, ret);
+	
+	errno = e;	
 	return ret;
 }
 
@@ -176,7 +202,6 @@ long cg_ptrace_l(enum __ptrace_request request, pid_t pid, unsigned long addr, u
 {
 	return cg_ptrace(request, pid, (void *)addr, (void *)data);
 }
-
 
 long cg_ptrace_lp(enum __ptrace_request request, pid_t pid, unsigned long addr, void *data)
 {
@@ -1296,7 +1321,7 @@ detach(struct tcb *tcp)
 	 */
 	for (;;) {
 		unsigned int sig;
-		if (waitpid(tcp->pid, &status, __WALL) < 0) {
+		if (cg_waitpid(tcp->pid, &status, __WALL) < 0) {
 			if (errno == EINTR)
 				continue;
 			/*
@@ -1819,7 +1844,7 @@ startup_child(char **argv, char **env)
 			if (!NOMMU_SYSTEM) {
 				/* Wait until child stopped itself */
 				int status;
-				while (waitpid(pid, &status, WSTOPPED) < 0) {
+				while (cg_waitpid(pid, &status, WSTOPPED) < 0) {
 					if (errno == EINTR)
 						continue;
 					perror_msg_and_die("waitpid");
@@ -1935,7 +1960,7 @@ test_ptrace_seize(void)
 		int status, tracee_pid;
 
 		errno = 0;
-		tracee_pid = waitpid(pid, &status, 0);
+		tracee_pid = cg_waitpid(pid, &status, 0);
 		if (tracee_pid <= 0) {
 			if (errno == EINTR)
 				continue;
@@ -4072,7 +4097,7 @@ terminate(void)
 	if (shared_log != stderr)
 		fclose(shared_log);
 	if (popen_pid) {
-		while (waitpid(popen_pid, NULL, 0) < 0 && errno == EINTR)
+		while (cg_waitpid(popen_pid, NULL, 0) < 0 && errno == EINTR)
 			;
 	}
 	if (sig) {

@@ -62,7 +62,7 @@ get_arch(void)
 	}
 
 	int status = 0;
-	if (waitpid(pid, &status, 0) != pid ||
+	if (cg_waitpid(pid, &status, 0) != pid ||
 	    !WIFSTOPPED(status) ||
 	    WSTOPSIG(status) != SIGSTOP) {
 		/* cannot happen */
@@ -77,7 +77,7 @@ get_arch(void)
 
 	int saved_errno = errno;
 	(void) kill(pid, SIGKILL);
-	(void) waitpid(pid, NULL, 0);
+	(void) cg_waitpid(pid, NULL, 0);
 	errno = saved_errno;
 
 	/*

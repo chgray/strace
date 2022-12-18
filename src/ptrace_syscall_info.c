@@ -125,7 +125,7 @@ test_ptrace_get_syscall_info(void)
 		};
 		const size_t size = sizeof(info);
 		int status;
-		long rc = waitpid(pid, &status, 0);
+		long rc = cg_waitpid(pid, &status, 0);
 		if (rc != pid) {
 			/* cannot happen */
 			kill_tracee(pid);
@@ -254,7 +254,7 @@ test_ptrace_get_syscall_info(void)
 done:
 	if (pid) {
 		kill_tracee(pid);
-		waitpid(pid, NULL, 0);
+		cg_waitpid(pid, NULL, 0);
 		ptrace_stop = -1U;
 	}
 

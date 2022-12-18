@@ -107,7 +107,7 @@ check_seccomp_order_tracer(int pid)
 		int status;
 
 		for (;;) {
-			long rc = waitpid(pid, &status, 0);
+			long rc = cg_waitpid(pid, &status, 0);
 			if (rc < 0 && errno == EINTR)
 				continue;
 			if (rc == pid)
@@ -243,7 +243,7 @@ check_seccomp_order(void)
 	if (pid) {
 		kill(pid, SIGKILL);
 		for (;;) {
-			long rc = waitpid(pid, NULL, 0);
+			long rc = cg_waitpid(pid, NULL, 0);
 			if (rc < 0 && errno == EINTR)
 				continue;
 			break;
