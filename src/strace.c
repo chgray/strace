@@ -135,34 +135,52 @@ void CG_PRINT(const char* format, ...)
 
 
 #if 1
-//long cg_ptrace2(enum __ptrace_request request, pid_t pid,
-//                   void *addr, void *data);
+// long cg_ptrace2(enum __ptrace_request request, pid_t pid,
+//                    void *addr, void *data);
 long cg_ptrace(enum __ptrace_request request, pid_t pid,
-                   void *addr, void *data);
+			   void *addr, void *data);
 long cg_ptrace_l(enum __ptrace_request request, pid_t pid,
-                   unsigned long addr, unsigned long data);
+				 unsigned long addr, unsigned long data);
 long cg_ptrace_lp(enum __ptrace_request request, pid_t pid,
-                   unsigned long addr, void *data);				   				   
-				   
-				   
+				  unsigned long addr, void *data);
+
+__pid_t cg_wait4(__pid_t __pid, int *__stat_loc, int __options,
+				 struct rusage *__usage) __THROWNL;
+
+__pid_t cg_wait(int *__stat_loc);
+
+__pid_t cg_wait4(__pid_t __pid, int *__stat_loc, int __options,
+				 struct rusage *__usage)
+{
+	CG_PRINT("CG_WAIT4(pid=%d)\r\n", __pid);
+	
+	return wait4(__pid, __stat_loc, __options, __usage);
+}
+
+__pid_t cg_wait(int *__stat_loc)
+{
+	CG_PRINT("CG_WAIT()\r\n");
+	return wait(__stat_loc);
+}
+
 long cg_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
 {
-	
+
 	CG_PRINT("CG_PTRACE(request=0x%8x, pid=%8d, addr=0x%8x, data=0x%8x)\r\n", request, pid, addr, data);
 	long ret = ptrace(request, pid, addr, data);
 	CG_PRINT("....ret=%ld\r\n", ret);
-	return ret; 
+	return ret;
 }
 
 long cg_ptrace_l(enum __ptrace_request request, pid_t pid, unsigned long addr, unsigned long data)
 {
-	return cg_ptrace(request, pid, (void*)addr, (void*)data);
+	return cg_ptrace(request, pid, (void *)addr, (void *)data);
 }
 
 
 long cg_ptrace_lp(enum __ptrace_request request, pid_t pid, unsigned long addr, void *data)
 {
-	return cg_ptrace(request, pid, (void*)addr, data);
+	return cg_ptrace(request, pid, (void *)addr, data);
 }
 
 #endif
@@ -1607,7 +1625,7 @@ CG_PRINT("closing to close : pid=%d\r\n", getpid());
 		alarm(3);
 		/* we depend on SIGCHLD set to SIG_DFL by init code */
 		/* if it happens to be SIG_IGN'ed, wait won't block */
-		while (wait(NULL) < 0 && errno == EINTR)
+		while (cg_wait(NULL) < 0 && errno == EINTR)
 			;
 		alarm(0);
 	}
@@ -3514,7 +3532,7 @@ next_event(void)
 	 */
 	int status;
 	struct rusage ru;
-	int pid = wait4(-1, &status, __WALL, (cflag ? &ru : NULL));
+	int pid = cg_wait4(-1, &status, __WALL, (cflag ? &ru : NULL));
 	int wait_errno = errno;
 
 	/*
@@ -3699,7 +3717,7 @@ next_event(void)
 			break;
 
 next_event_wait_next:
-		pid = wait4(-1, &status, __WALL | WNOHANG, (cflag ? &ru : NULL));
+		pid = cg_wait4(-1, &status, __WALL | WNOHANG, (cflag ? &ru : NULL));
 		wait_errno = errno;
 		wait_nohang = true;
 	}
