@@ -17,7 +17,7 @@ static int
 arch_set_scno(struct tcb *tcp, kernel_ulong_t scno)
 {
 	unsigned int n = (uint16_t) scno;
-	int rc = ptrace(PTRACE_SET_SYSCALL, tcp->pid, NULL, (unsigned long) n);
+	int rc = cg_ptrace(PTRACE_SET_SYSCALL, tcp->pid, NULL, (unsigned long) n);
 	if (rc && errno != ESRCH)
 		perror_msg("arch_set_scno: PTRACE_SET_SYSCALL pid:%d scno:%#x",
 			   tcp->pid, n);

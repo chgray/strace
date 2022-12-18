@@ -253,7 +253,7 @@ umoven_peekdata(const int pid, kernel_ulong_t addr, unsigned int len,
 
 		errno = 0;
 		dissected_long_t u = {
-			.val = ptrace(PTRACE_PEEKDATA, pid, addr, 0)
+			.val = cg_ptrace_l(PTRACE_PEEKDATA, pid, addr, 0)
 		};
 
 		switch (errno) {
@@ -349,7 +349,7 @@ umovestr_peekdata(const int pid, kernel_ulong_t addr, unsigned int len,
 
 		errno = 0;
 		dissected_long_t u = {
-			.val = ptrace(PTRACE_PEEKDATA, pid, addr, 0)
+			.val = cg_ptrace_l(PTRACE_PEEKDATA, pid, addr, 0)
 		};
 
 		switch (errno) {
@@ -475,7 +475,7 @@ upoken_peekpoke(const int pid, const kernel_ulong_t addr,
 {
 	errno = 0;
 	dissected_long_t u = {
-		.val = ptrace(PTRACE_PEEKDATA, pid, addr, 0)
+		.val = cg_ptrace_l (PTRACE_PEEKDATA, pid, addr, 0)
 	};
 	if (errno)
 		return false;
@@ -483,7 +483,7 @@ upoken_peekpoke(const int pid, const kernel_ulong_t addr,
 	memcpy(u.data + offset, our_addr, len);
 
 	/* write it back */
-	return ptrace(PTRACE_POKEDATA, pid, addr, u.val) == 0;
+	return cg_ptrace_l(PTRACE_POKEDATA, pid, addr, u.val) == 0;
 }
 
 static unsigned int
@@ -510,7 +510,7 @@ upoken_pokedata(const int pid, kernel_ulong_t addr, unsigned int len,
 		/* our_addr may be unaligned */
 		long word;
 		memcpy(&word, our_addr, sizeof(word));
-		if (ptrace(PTRACE_POKEDATA, pid, addr, word) < 0)
+		if (cg_ptrace_l(PTRACE_POKEDATA, pid, addr, word) < 0)
 			goto poke_error;
 
 		addr += sizeof(long);

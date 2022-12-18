@@ -21,7 +21,7 @@ arch_set_scno(struct tcb *tcp, kernel_ulong_t scno)
 		.iov_base = &n,
 		.iov_len = sizeof(n)
 	};
-	int rc = ptrace(PTRACE_SETREGSET, tcp->pid, NT_ARM_SYSTEM_CALL, &io);
+	int rc = cg_ptrace(PTRACE_SETREGSET, tcp->pid, NT_ARM_SYSTEM_CALL, &io);
 	if (rc && errno != ESRCH)
 		perror_func_msg("NT_ARM_SYSTEM_CALL pid:%d scno:%#x",
 				tcp->pid, n);

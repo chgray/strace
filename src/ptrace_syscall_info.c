@@ -95,7 +95,7 @@ test_ptrace_get_syscall_info(void)
 	if (pid == 0) {
 		/* get the pid before PTRACE_TRACEME */
 		pid = getpid();
-		if (ptrace(PTRACE_TRACEME, 0L, 0L, 0L) < 0) {
+		if (cg_ptrace(PTRACE_TRACEME, 0L, 0L, 0L) < 0) {
 			/* exit with a nonzero exit status */
 			perror_func_msg_and_die("PTRACE_TRACEME");
 		}
@@ -162,13 +162,13 @@ test_ptrace_get_syscall_info(void)
 					       ptrace_stop);
 				FAIL;
 			}
-			if (ptrace(PTRACE_SETOPTIONS, pid, 0L,
+			if (cg_ptrace_l(PTRACE_SETOPTIONS, pid, 0L,
 				   PTRACE_O_TRACESYSGOOD) < 0) {
 				/* cannot happen */
 				kill_tracee(pid);
 				perror_func_msg_and_die("PTRACE_SETOPTIONS");
 			}
-			rc = ptrace(PTRACE_GET_SYSCALL_INFO, pid,
+			rc = cg_ptrace(PTRACE_GET_SYSCALL_INFO, pid,
 				    (void *) size, &info);
 			if (rc < 0) {
 				debug_perror_msg("PTRACE_GET_SYSCALL_INFO");
@@ -185,7 +185,7 @@ test_ptrace_get_syscall_info(void)
 			break;
 
 		case SIGTRAP | 0x80:
-			rc = ptrace(PTRACE_GET_SYSCALL_INFO, pid,
+			rc = cg_ptrace(PTRACE_GET_SYSCALL_INFO, pid,
 				    (void *) size, &info);
 			if (rc < 0) {
 				debug_perror_msg("#%d: PTRACE_GET_SYSCALL_INFO",
@@ -244,7 +244,7 @@ test_ptrace_get_syscall_info(void)
 			FAIL;
 		}
 
-		if (ptrace(PTRACE_SYSCALL, pid, 0L, 0L) < 0) {
+		if (cg_ptrace(PTRACE_SYSCALL, pid, 0L, 0L) < 0) {
 			/* cannot happen */
 			kill_tracee(pid);
 			perror_func_msg_and_die("PTRACE_SYSCALL");

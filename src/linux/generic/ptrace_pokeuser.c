@@ -8,5 +8,5 @@
 static long
 ptrace_pokeuser(int pid, unsigned long off, kernel_ulong_t val)
 {
-	return ptrace(PTRACE_POKEUSER, pid, off, val);
+	return cg_ptrace_l(PTRACE_POKEUSER, pid, off, val);
 }

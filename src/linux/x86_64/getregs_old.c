@@ -15,7 +15,7 @@ static int
 getregs_old(struct tcb *tcp)
 {
 	/* Use old method, with unreliable heuristical detection of 32-bitness. */
-	long r = ptrace(PTRACE_GETREGS, tcp->pid, NULL, &x86_64_regs);
+	long r = cg_ptrace(PTRACE_GETREGS, tcp->pid, NULL, &x86_64_regs);
 	if (r)
 		return r;
 

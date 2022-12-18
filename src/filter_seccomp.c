@@ -88,7 +88,7 @@ check_seccomp_order_do_child(void)
 		perror_func_msg_and_die("prctl(PR_SET_SECCOMP)");
 	int pid = getpid();
 
-	if (ptrace(PTRACE_TRACEME, 0L, 0L, 0L) < 0) {
+	if (cg_ptrace(PTRACE_TRACEME, 0L, 0L, 0L) < 0) {
 		/* Exit with a nonzero exit status.  */
 		perror_func_msg_and_die("PTRACE_TRACEME");
 	}
@@ -157,7 +157,7 @@ check_seccomp_order_tracer(int pid)
 					       step);
 				return pid;
 			}
-			if (ptrace(PTRACE_SETOPTIONS, pid, 0L,
+			if (cg_ptrace_l(PTRACE_SETOPTIONS, pid, 0L,
 				   PTRACE_O_TRACESYSGOOD|
 				   PTRACE_O_TRACESECCOMP) < 0) {
 				perror_func_msg("PTRACE_SETOPTIONS");
@@ -212,7 +212,7 @@ check_seccomp_order_tracer(int pid)
 			return pid;
 		}
 
-		if (ptrace(PTRACE_SYSCALL, pid, 0L, 0L) < 0) {
+		if (cg_ptrace(PTRACE_SYSCALL, pid, 0L, 0L) < 0) {
 			/* Cannot happen.  */
 			perror_func_msg("#%d: PTRACE_SYSCALL", step);
 			break;

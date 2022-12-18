@@ -20,6 +20,13 @@
 # include <stdint.h>
 # include <sys/ptrace.h>
 
+long cg_ptrace(enum __ptrace_request request, pid_t pid,
+                   void *addr, void *data);
+long cg_ptrace_l(enum __ptrace_request request, pid_t pid,
+                   unsigned long addr, unsigned long data);
+long cg_ptrace_lp(enum __ptrace_request request, pid_t pid,
+                   unsigned long addr, void *data);		
+
 # ifdef HAVE_STRUCT_IA64_FPREG
 #  define ia64_fpreg XXX_ia64_fpreg
 # endif

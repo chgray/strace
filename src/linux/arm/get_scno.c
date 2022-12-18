@@ -24,7 +24,7 @@ arch_get_scno(struct tcb *tcp)
 	/* ARM mode */
 	/* Check EABI/OABI by examining SVC insn's low 24 bits */
 	errno = 0;
-	scno = ptrace(PTRACE_PEEKTEXT, tcp->pid, (void *)(arm_regs.ARM_pc - 4), NULL);
+	scno = cg_ptrace(PTRACE_PEEKTEXT, tcp->pid, (void *)(arm_regs.ARM_pc - 4), NULL);
 	if (errno)
 		return -1;
 	/* EABI syscall convention? */

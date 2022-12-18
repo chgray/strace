@@ -1079,7 +1079,7 @@ ptrace_getregset(pid_t pid)
 # ifdef ARCH_IOVEC_FOR_GETREGSET
 	/* variable iovec */
 	ARCH_IOVEC_FOR_GETREGSET.iov_len = sizeof(ARCH_REGS_FOR_GETREGSET);
-	return ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS,
+	return cg_ptrace(PTRACE_GETREGSET, pid, (void*)NT_PRSTATUS,
 		      &ARCH_IOVEC_FOR_GETREGSET);
 # else
 	/* constant iovec */
@@ -1087,7 +1087,7 @@ ptrace_getregset(pid_t pid)
 		.iov_base = &ARCH_REGS_FOR_GETREGSET,
 		.iov_len = sizeof(ARCH_REGS_FOR_GETREGSET)
 	};
-	return ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS, &io);
+	return cg_ptrace(PTRACE_GETREGSET, pid, (void*)NT_PRSTATUS, &io);
 
 # endif
 }
@@ -1099,7 +1099,7 @@ ptrace_setregset(pid_t pid)
 {
 #  ifdef ARCH_IOVEC_FOR_GETREGSET
 	/* variable iovec */
-	return ptrace(PTRACE_SETREGSET, pid, NT_PRSTATUS,
+	return cg_ptrace(PTRACE_SETREGSET, pid, NT_PRSTATUS,
 		      &ARCH_IOVEC_FOR_GETREGSET);
 #  else
 	/* constant iovec */
@@ -1107,7 +1107,7 @@ ptrace_setregset(pid_t pid)
 		.iov_base = &ARCH_REGS_FOR_GETREGSET,
 		.iov_len = sizeof(ARCH_REGS_FOR_GETREGSET)
 	};
-	return ptrace(PTRACE_SETREGSET, pid, NT_PRSTATUS, &io);
+	return cg_ptrace(PTRACE_SETREGSET, pid, NT_PRSTATUS, &io);
 #  endif
 }
 # endif /* ARCH_MIGHT_USE_SET_REGS */
@@ -1120,9 +1120,9 @@ ptrace_getregs(pid_t pid)
 {
 # if defined SPARC || defined SPARC64
 	/* SPARC systems have the meaning of data and addr reversed */
-	return ptrace(PTRACE_GETREGS, pid, (void *) &ARCH_REGS_FOR_GETREGS, 0);
+	return cg_ptrace(PTRACE_GETREGS, pid, (void *) &ARCH_REGS_FOR_GETREGS, 0);
 # else
-	return ptrace(PTRACE_GETREGS, pid, NULL, &ARCH_REGS_FOR_GETREGS);
+	return cg_ptrace(PTRACE_GETREGS, pid, NULL, &ARCH_REGS_FOR_GETREGS);
 # endif
 }
 
@@ -1133,9 +1133,9 @@ ptrace_setregs(pid_t pid)
 {
 #  if defined SPARC || defined SPARC64
 	/* SPARC systems have the meaning of data and addr reversed */
-	return ptrace(PTRACE_SETREGS, pid, (void *) &ARCH_REGS_FOR_GETREGS, 0);
+	return cg_ptrace(PTRACE_SETREGS, pid, (void *) &ARCH_REGS_FOR_GETREGS, 0);
 #  else
-	return ptrace(PTRACE_SETREGS, pid, NULL, &ARCH_REGS_FOR_GETREGS);
+	return cg_ptrace(PTRACE_SETREGS, pid, NULL, &ARCH_REGS_FOR_GETREGS);
 #  endif
 }
 # endif /* ARCH_MIGHT_USE_SET_REGS */
@@ -1252,7 +1252,7 @@ strace_get_syscall_info(struct tcb *tcp)
 	 */
 	if (ptrace_sci.op == 0xff) {
 		const size_t size = sizeof(ptrace_sci);
-		if (ptrace(PTRACE_GET_SYSCALL_INFO, tcp->pid,
+		if (cg_ptrace(PTRACE_GET_SYSCALL_INFO, tcp->pid,
 			   (void *) size, &ptrace_sci) < 0) {
 			get_regs_error = -2;
 			return false;

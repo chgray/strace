@@ -54,7 +54,7 @@ get_arch(void)
 	if (pid == 0) {
 		/* get the pid before PTRACE_TRACEME */
 		pid = getpid();
-		if (ptrace(PTRACE_TRACEME, 0, 0, 0))
+		if (cg_ptrace(PTRACE_TRACEME, 0, 0, 0))
 			perror_msg_and_die("PTRACE_TRACEME");
 		kill(pid, SIGSTOP);
 		/* unreachable */
@@ -73,7 +73,7 @@ get_arch(void)
 		offsetof(struct_ptrace_syscall_info, entry);
 	struct_ptrace_syscall_info psi = { .arch = 0 };
 
-	long rc = ptrace(PTRACE_GET_SYSCALL_INFO, pid, size, &psi);
+	long rc = cg_ptrace_lp(PTRACE_GET_SYSCALL_INFO, pid, size, &psi);
 
 	int saved_errno = errno;
 	(void) kill(pid, SIGKILL);
