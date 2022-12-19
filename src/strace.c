@@ -200,16 +200,28 @@ __pid_t cg_waitpid(__pid_t __pid, int *__stat_loc, int __options)
 	return ret;
 }
 
+__pid_t waitingProcess = -1;
+
 __pid_t cg_wait4(__pid_t __pid, int *__stat_loc, int __options,
 				 struct rusage *__usage)
 {
 	__pid_t ret = wait4(__pid, __stat_loc, __options, __usage);
 	int e = errno;
-	
+
 	char processName[1024];
 	GetProcessName(ret, processName);
+		
+	CG_PRINT("NEW_CG_WAIT4(%d, options=0x%8x, usage=0x%8x) =(%s)%d, status=0x%x, errno=%d\r\n", __pid, __options, __usage, processName, ret, *(__stat_loc), e);	
 	
-	CG_PRINT("NEW_CG_WAIT4(%d, options=0x%8x, usage=0x%8x) =(%s)%d, status=0x%x\r\n", __pid, __options, __usage, processName, ret, *(__stat_loc));	
+	if(0 != ret)
+	{
+		if(-1 != waitingProcess)
+		{
+			CG_PRINT("MULTIPLES(%d)... : %d, %d\r\n", __pid, ret, waitingProcess);
+			exit(100);
+		}
+		waitingProcess = ret;
+	}
 	
 	errno = e;
 	return ret;
@@ -237,7 +249,18 @@ long cg_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
 	long ret = ptrace(request, pid, addr, data);
 	
 	int e = errno;	
-	CG_PRINT("NEW_CG_PTRACE(request=0x%8x, pid=(%s)%8d, addr=0x%8x, data=0x%8x) - ret=%ld\r\n", request, processName, pid, addr, data, ret);
+	
+	CG_PRINT("NEW_CG_PTRACE(request=0x%8x, pid=(%s)%8d, addr=0x%8x, data=0x%8x) - ret=%ld, errno=%d\r\n", request, processName, pid, addr, data, ret, errno);
+	if(request == PTRACE_SYSCALL || request == PTRACE_LISTEN)
+	{
+		if(-1 != waitingProcess && pid != waitingProcess)
+		{
+			CG_PRINT("DIFFERENT PID... : %d\r\n", waitingProcess);
+			exit(101);
+		}
+		//CG_PRINT("...ptrace cleared");
+		waitingProcess = -1;
+	}
 	
 	errno = e;	
 	return ret;
@@ -3601,6 +3624,7 @@ next_event(void)
 	 */
 	int status;
 	struct rusage ru;
+	CG_PRINT("Sleeping...\r\n"); 
 	int pid = cg_wait4(-1, &status, __WALL, (cflag ? &ru : NULL));
 	int wait_errno = errno;
 
@@ -3645,7 +3669,10 @@ next_event(void)
 		}
 
 		if (!pid)
+		{
+			CG_PRINT("NOPID\r\n");
 			break;
+		}
 
 		if (pid == popen_pid) {
 			if (!WIFSTOPPED(status))
@@ -3786,7 +3813,8 @@ next_event(void)
 			break;
 
 next_event_wait_next:
-		pid = cg_wait4(-1, &status, __WALL | WNOHANG, (cflag ? &ru : NULL));
+		pid = 0;//cg_wait4(-1, &status, __WALL | WNOHANG, (cflag ? &ru : NULL));
+		errno = 0;
 		wait_errno = errno;
 		wait_nohang = true;
 	}
@@ -3974,6 +4002,7 @@ dispatch_event(const struct tcb_wait_data *wd)
 
 	case TE_EXITED:
 		print_exited(current_tcp, current_tcp->pid, status);
+		waitingProcess = -1;
 		droptcb(current_tcp);
 		return true;
 
