@@ -96,6 +96,9 @@ static unsigned int version_verbosity;
 #if 0
 #define CG_PRINT(...)
 #else
+long int g_StartTime;
+
+
 void CG_PRINT(const char* format, ...);
 void CG_PRINT(const char* format, ...) 
 { 
@@ -125,7 +128,7 @@ void CG_PRINT(const char* format, ...)
     vsprintf (msg, format, args);
     va_end (args);
     
-    fprintf(out, "%7d(%d) [*****] %s", getpid(), parent, msg);
+    fprintf(out, "%8ld - %7d(%d) [*****] %s", GetTickCount() - g_StartTime , getpid(), parent, msg);
     //printf("%7d(%d) [*****] %s", getpid(), parent, msg);
  
     fflush(out);
@@ -135,13 +138,14 @@ void CG_PRINT(const char* format, ...)
 
 
 #if 1
-/*
-long int CG_GetTickCount()
+
+
+long int GetTickCount(void)
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)(ts.tv_nsec / 1000000) + ((uint64_t)ts.tv_sec * 1000ull);
-}*/
+}
 
 void GetProcessName(int pid, char *name)
 {
@@ -184,14 +188,13 @@ __pid_t cg_wait(int *__stat_loc);
 
 __pid_t cg_waitpid(__pid_t __pid, int *__stat_loc, int __options)
 {
-	//unsigned long tick = CG_GetTickCount();
 	__pid_t ret = waitpid(__pid, __stat_loc, __options);	
 	int e = errno;
 		
 	char processName[1024];
 	GetProcessName(ret, processName);
 		
-	CG_PRINT("NEW_CG_WAITPID(pid=(%s)%d = %d\r\n", processName, __pid, ret);
+	CG_PRINT("NEW_CG_WAITPID(%d) = %s(%d)\r\n", __pid, processName, ret);
 	
 	errno = e;
 	return ret;
@@ -206,7 +209,7 @@ __pid_t cg_wait4(__pid_t __pid, int *__stat_loc, int __options,
 	char processName[1024];
 	GetProcessName(ret, processName);
 	
-	CG_PRINT("NEW_CG_WAIT4(pid=(%s)%d,  ret=%d)\r\n", processName, __pid, ret);	
+	CG_PRINT("NEW_CG_WAIT4(%d, options=0x%8x, usage=0x%8x) =(%s)%d, status=0x%x\r\n", __pid, __options, __usage, processName, ret, *(__stat_loc));	
 	
 	errno = e;
 	return ret;
@@ -220,7 +223,7 @@ __pid_t cg_wait(int *__stat_loc)
 	char processName[1024];
 	GetProcessName(ret, processName);
 	
-	CG_PRINT("NEW_CG_WAIT(ret=(%s)%d\r\n", processName, ret);	
+	CG_PRINT("NEW_CG_WAIT() = (%s)%d\r\n", processName, ret);	
 	
 	errno = e;
 	return ret;
@@ -725,12 +728,11 @@ ptrace_restart(const unsigned int op, struct tcb *const tcp, unsigned int sig)
 {
 	int err;
 	errno = 0;
-	CG_PRINT("PTRACE_RESTART,  operation(%d) on pid=%d, sig=%d\r\n", op, tcp->pid, sig);	
+	//CG_PRINT("PTRACE_RESTART,  operation(%d) on pid=%d, sig=%d\r\n", op, tcp->pid, sig);	
 	cg_ptrace_l(op, tcp->pid, 0L, (unsigned long) sig);
 	err = errno;
 	if (!err || err == ESRCH)
-	{
-		CG_PRINT("...ptrace err=%d\r\n", err);
+	{		
 		return 0;
 	}
 
@@ -4176,6 +4178,8 @@ terminate(void)
 int
 main(int argc, char *argv[])
 {
+	g_StartTime = GetTickCount();
+	
 	setlocale(LC_ALL, "");
 	init(argc, argv);
 
